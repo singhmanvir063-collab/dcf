@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 
 const FONTS = "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&display=swap";
 
@@ -142,19 +142,38 @@ function calcWACC(beta) {
 }
 
 /* ── Styles ── */
-const S = {
+const LIGHT = {
   bg: "#f7f8fa", card: "#fff", border: "#e4e7ec", text: "#1b1f2e",
   sub: "#5f6b7a", muted: "#97a0ae", accent: "#2563eb", accentBg: "#f0f4ff",
   green: "#059669", red: "#dc2626", greenBg: "#05966910", redBg: "#dc262610",
-  mono: "'IBM Plex Mono', monospace", sans: "'Instrument Sans', sans-serif",
-};
-const iBase = {
-  padding: "7px 10px", background: "#fff", border: `1px solid ${S.border}`,
-  borderRadius: 6, color: S.text, fontFamily: S.mono, fontSize: 13, outline: "none",
+  inputBg: "#fff",
 };
 
+const DARK = {
+  bg: "#0f1117", card: "#1a1d28", border: "#2a2e3b", text: "#e4e7ec",
+  sub: "#9ca3b0", muted: "#6b7280", accent: "#3b82f6", accentBg: "#3b82f615",
+  green: "#10b981", red: "#ef4444", greenBg: "#10b98115", redBg: "#ef444415",
+  inputBg: "#232636",
+};
+
+const FONTS_SHARED = {
+  mono: "'IBM Plex Mono', monospace", sans: "'Instrument Sans', sans-serif",
+};
+
+function getTheme(dark) {
+  return { ...(dark ? DARK : LIGHT), ...FONTS_SHARED };
+}
+
+function getInputBase(S) {
+  return {
+    padding: "7px 10px", background: S.inputBg, border: `1px solid ${S.border}`,
+    borderRadius: 6, color: S.text, fontFamily: S.mono, fontSize: 13, outline: "none",
+  };
+}
+
 /* ── Sub-Components ── */
-function Field({ label, value, onChange, suffix, w = 90 }) {
+function Field({ label, value, onChange, suffix, w = 90, S }) {
+  const iBase = getInputBase(S);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <label style={{ fontSize: 10, fontFamily: S.mono, color: S.muted, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 500 }}>{label}</label>
@@ -167,7 +186,8 @@ function Field({ label, value, onChange, suffix, w = 90 }) {
   );
 }
 
-function YearInputs({ label, values, onChange }) {
+function YearInputs({ label, values, onChange, S }) {
+  const iBase = getInputBase(S);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <label style={{ fontSize: 10, fontFamily: S.mono, color: S.muted, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 500 }}>{label}</label>
@@ -185,7 +205,7 @@ function YearInputs({ label, values, onChange }) {
   );
 }
 
-function Card({ title, tag, children }) {
+function Card({ title, tag, children, S }) {
   return (
     <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 10, padding: "20px 24px" }}>
       {(title || tag) && (
@@ -199,10 +219,55 @@ function Card({ title, tag, children }) {
   );
 }
 
+function ThemeToggle({ dark, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      style={{
+        position: "fixed", top: 18, right: 18, zIndex: 999,
+        width: 40, height: 40, borderRadius: "50%",
+        border: "1px solid " + (dark ? "#2a2e3b" : "#e4e7ec"),
+        background: dark ? "#1a1d28" : "#fff",
+        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: dark ? "0 2px 12px rgba(0,0,0,0.5)" : "0 2px 12px rgba(0,0,0,0.08)",
+        transition: "all 0.3s ease",
+      }}
+    >
+      {dark ? (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="5" />
+          <line x1="12" y1="1" x2="12" y2="3" />
+          <line x1="12" y1="21" x2="12" y2="23" />
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+          <line x1="1" y1="12" x2="3" y2="12" />
+          <line x1="21" y1="12" x2="23" y2="12" />
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </svg>
+      ) : (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 /* ── MAIN ── */
 const TABS = ["Model", "Sensitivity", "Valuation"];
 
 export default function DCFApp() {
+  const [dark, setDark] = useState(() => {
+    try { return localStorage.getItem("dcf-dark-mode") === "true"; } catch { return false; }
+  });
+  const S = useMemo(() => getTheme(dark), [dark]);
+
+  useEffect(() => {
+    try { localStorage.setItem("dcf-dark-mode", dark); } catch {}
+  }, [dark]);
+
   const [selectedTicker, setSelectedTicker] = useState("");
   const [tab, setTab] = useState("Model");
 
@@ -256,8 +321,10 @@ export default function DCFApp() {
         .ticker-btn.active { border-color: ${S.accent}; background: ${S.accentBg}; box-shadow: 0 0 0 1px ${S.accent}; }
         .ticker-btn .sym { font-weight: 700; font-size: 13px; }
         .ticker-btn .nm { font-size: 9px; color: ${S.muted}; font-family: ${S.sans}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
+        input[type="number"] { color-scheme: ${dark ? "dark" : "light"}; }
       `}</style>
-      <div style={{ minHeight: "100vh", background: S.bg, color: S.text, fontFamily: S.sans, padding: "28px 20px" }}>
+      <ThemeToggle dark={dark} onToggle={() => setDark(d => !d)} />
+      <div style={{ minHeight: "100vh", background: S.bg, color: S.text, fontFamily: S.sans, padding: "28px 20px", transition: "background 0.3s ease, color 0.3s ease" }}>
         <div style={{ maxWidth: 920, margin: "0 auto" }}>
 
           {/* ── Header ── */}
@@ -289,7 +356,7 @@ export default function DCFApp() {
           </div>
 
           {/* ── Company Selector ── */}
-          <Card title="Select Company" tag="SEC FILING DATA">
+          <Card title="Select Company" tag="SEC FILING DATA" S={S}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {TICKERS.map(t => (
                 <button key={t} className={`ticker-btn ${selectedTicker === t ? "active" : ""}`} onClick={() => loadCompany(t)}>
@@ -316,27 +383,27 @@ export default function DCFApp() {
           {/* ══ MODEL ══ */}
           {tab === "Model" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <Card title="Assumptions">
+              <Card title="Assumptions" S={S}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 14, marginBottom: 18 }}>
-                  <Field label="Revenue ($M)" value={a.currentRevenue} onChange={v => u("currentRevenue", v)} w={110} />
-                  <Field label="Net Debt ($M)" value={a.netDebt} onChange={v => u("netDebt", v)} w={100} />
-                  <Field label="Shares (M)" value={a.sharesOutstanding} onChange={v => u("sharesOutstanding", v)} w={90} />
-                  <Field label="Tax Rate" value={a.taxRate} onChange={v => u("taxRate", v)} suffix="%" w={64} />
-                  <Field label="WACC" value={a.wacc} onChange={v => u("wacc", v)} suffix="%" w={64} />
-                  <Field label="Terminal g" value={a.terminalGrowth} onChange={v => u("terminalGrowth", v)} suffix="%" w={64} />
+                  <Field label="Revenue ($M)" value={a.currentRevenue} onChange={v => u("currentRevenue", v)} w={110} S={S} />
+                  <Field label="Net Debt ($M)" value={a.netDebt} onChange={v => u("netDebt", v)} w={100} S={S} />
+                  <Field label="Shares (M)" value={a.sharesOutstanding} onChange={v => u("sharesOutstanding", v)} w={90} S={S} />
+                  <Field label="Tax Rate" value={a.taxRate} onChange={v => u("taxRate", v)} suffix="%" w={64} S={S} />
+                  <Field label="WACC" value={a.wacc} onChange={v => u("wacc", v)} suffix="%" w={64} S={S} />
+                  <Field label="Terminal g" value={a.terminalGrowth} onChange={v => u("terminalGrowth", v)} suffix="%" w={64} S={S} />
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 18 }}>
-                  <YearInputs label="Revenue Growth (%)" values={a.revenueGrowth} onChange={v => u("revenueGrowth", v)} />
-                  <YearInputs label="EBITDA Margin (%)" values={a.ebitdaMargin} onChange={v => u("ebitdaMargin", v)} />
+                  <YearInputs label="Revenue Growth (%)" values={a.revenueGrowth} onChange={v => u("revenueGrowth", v)} S={S} />
+                  <YearInputs label="EBITDA Margin (%)" values={a.ebitdaMargin} onChange={v => u("ebitdaMargin", v)} S={S} />
                 </div>
                 <div style={{ display: "flex", gap: 14 }}>
-                  <Field label="D&A % Rev" value={a.daPercent} onChange={v => u("daPercent", v)} suffix="%" w={64} />
-                  <Field label="CapEx % Rev" value={a.capexPercent} onChange={v => u("capexPercent", v)} suffix="%" w={64} />
-                  <Field label="ΔNWC % Rev" value={a.nwcPercent} onChange={v => u("nwcPercent", v)} suffix="%" w={64} />
+                  <Field label="D&A % Rev" value={a.daPercent} onChange={v => u("daPercent", v)} suffix="%" w={64} S={S} />
+                  <Field label="CapEx % Rev" value={a.capexPercent} onChange={v => u("capexPercent", v)} suffix="%" w={64} S={S} />
+                  <Field label="ΔNWC % Rev" value={a.nwcPercent} onChange={v => u("nwcPercent", v)} suffix="%" w={64} S={S} />
                 </div>
               </Card>
 
-              <Card title="Projected Financials ($M)">
+              <Card title="Projected Financials ($M)" S={S}>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
@@ -368,7 +435,7 @@ export default function DCFApp() {
 
           {/* ══ SENSITIVITY ══ */}
           {tab === "Sensitivity" && (
-            <Card title="Sensitivity — Implied Share Price">
+            <Card title="Sensitivity — Implied Share Price" S={S}>
               <p style={{ fontSize: 12, color: S.sub, margin: "0 0 16px" }}>WACC (rows) × Terminal Growth (columns). Base case outlined.</p>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -441,7 +508,7 @@ export default function DCFApp() {
                 </div>
               </div>
 
-              <Card title="Valuation Bridge ($M)">
+              <Card title="Valuation Bridge ($M)" S={S}>
                 {[
                   { l: "PV of Projected FCFs (Yr 1–5)", v: r.sumPV },
                   { l: "PV of Terminal Value", v: r.pvTV },
@@ -461,7 +528,7 @@ export default function DCFApp() {
                 ))}
               </Card>
 
-              <Card>
+              <Card S={S}>
                 <div style={{ fontSize: 10, fontFamily: S.mono, color: S.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, fontWeight: 500 }}>Methodology</div>
                 <p style={{ fontSize: 13, color: S.sub, lineHeight: 1.8, margin: 0 }}>
                   5-year unlevered FCF projection: NOPAT + D&A − CapEx − ΔNWC. Terminal Value via Gordon Growth Model. WACC estimated using CAPM (Rf + β × MRP). Enterprise Value = Σ PV(FCF) + PV(TV). Equity Value = EV − Net Debt. Company financials sourced from SEC annual filings. All assumptions are fully adjustable.
